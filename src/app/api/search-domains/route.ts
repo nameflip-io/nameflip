@@ -1,23 +1,9 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { createServerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import type { DomainResult, SearchParams } from "@/lib/types";
 
-// NOTE: `@supabase/auth-helpers-nextjs` (0.15.0) has been gutted in favor of
-// `@supabase/ssr` — it only exports the modern `createServerClient` (getAll/
-// setAll cookie adapters), not the deprecated `createRouteHandlerClient`.
-// Same pattern already used in src/app/auth/callback/route.ts.
-
-const PLAN_SEARCH_LIMITS: Record<string, number> = {
-  free: 5,
-  pro: 50,
-  pro_plus: 9999,
-};
-
-function currentMonth(): string {
-  return new Date().toISOString().slice(0, 7); // "YYYY-MM"
-}
+const SEARCH_RATE_LIMIT = 30;
 
 const SYSTEM_PROMPT = `You are a domain research tool. Given a search query and an optional TLD filter, suggest realistic expired or available domain names that would match. Return a JSON array of domain objects, each with:
 - domain: string (full domain with TLD, e.g. 'aiinvoice.com')
@@ -38,6 +24,15 @@ function extractJsonArray(text: string): unknown[] {
 }
 
 export async function POST(request: Request) {
+  const ip = getClientIp(request);
+  const { allowed } = checkRateLimit(`search:${ip}`, SEARCH_RATE_LIMIT);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Rate limit reached", upgradeRequired: true },
+      { status: 429 }
+    );
+  }
+
   let params: SearchParams;
   try {
     const body = await request.json();
@@ -52,64 +47,6 @@ export async function POST(request: Request) {
 
   if (!params.query) {
     return NextResponse.json({ error: "Query is required" }, { status: 400 });
-  }
-
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("searches_used_today, last_reset_date, plan")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError || !profile) {
-    return NextResponse.json({ error: "Profile not found" }, { status: 500 });
-  }
-
-  const month = currentMonth();
-  const searchesUsed =
-    profile.last_reset_date === month ? profile.searches_used_today ?? 0 : 0;
-  const plan = (profile.plan as string) ?? "free";
-  const limit = PLAN_SEARCH_LIMITS[plan] ?? PLAN_SEARCH_LIMITS.free;
-
-  if (searchesUsed >= limit) {
-    return NextResponse.json(
-      { error: "Monthly search limit reached", upgradeRequired: true, plan },
-      { status: 429 }
-    );
-  }
-
-  const { error: incrementError } = await supabase
-    .from("profiles")
-    .update({ searches_used_today: searchesUsed + 1, last_reset_date: month })
-    .eq("id", user.id);
-
-  if (incrementError) {
-    return NextResponse.json({ error: "Search failed" }, { status: 500 });
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -146,7 +83,5 @@ export async function POST(request: Request) {
   }
 }
 
-// Test search: log in, type "AI tools" and click Search — should return
-// 8-12 real domain suggestions from Claude once ANTHROPIC_API_KEY is set.
-// Test quota: search 6 times on a free plan — the 6th returns 429 with
-// { error: "Monthly search limit reached", upgradeRequired: true, plan }.
+// Test: type "AI tools" and click Search — should return 8-12 real domain
+// suggestions from Claude once ANTHROPIC_API_KEY is set in .env.local.
