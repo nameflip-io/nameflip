@@ -20,8 +20,10 @@ export interface DomainResult {
   analysis?: DomainAnalysis;
 }
 
+export type DomainCategory = "all" | "com" | "io" | "net" | "co" | "org";
+
 export interface SearchParams {
   query: string;
-  category: "flip" | "build" | "seo" | "all";
+  category: DomainCategory;
   limit: number;
 }

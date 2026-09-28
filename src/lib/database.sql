@@ -12,7 +12,9 @@ create table public.profiles (
   subscription_status text default 'inactive',
   searches_used_today integer default 0,
   analyses_used_today integer default 0,
-  last_reset_date date default current_date,
+  -- Stored as a 'YYYY-MM' month string (not a real date) so the app can
+  -- cheaply compare "is this still the current month" without date math.
+  last_reset_date text,
   created_at timestamptz default now()
 );
 
@@ -21,6 +23,7 @@ create table public.saved_domains (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references public.profiles on delete cascade,
   domain text not null,
+  tld text,
   analysis jsonb,
   notes text,
   monetization_mode text default 'for_sale',
@@ -33,6 +36,8 @@ create table public.campaigns (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references public.profiles on delete cascade,
   name text,
+  description text,
+  niche text,
   goal text,
   budget integer,
   risk_level text,
@@ -40,6 +45,10 @@ create table public.campaigns (
   status text default 'active',
   created_at timestamptz default now()
 );
+
+-- Links a saved domain to a campaign (a domain belongs to at most one).
+alter table public.saved_domains
+  add column campaign_id uuid references public.campaigns on delete set null;
 
 -- Enable Row Level Security
 alter table public.profiles enable row level security;
