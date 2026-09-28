@@ -51,7 +51,9 @@ import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/Toggle";
 import { openUpgradeModal } from "@/components/upgrade-modal";
+import { BUDGET_TIERS } from "@/lib/types";
 import type {
+  BudgetTier,
   DomainAnalysis,
   DomainResult as ApiSearchResult,
 } from "@/lib/types";
@@ -268,15 +270,7 @@ function CheckIcon({ className }: { className?: string }) {
 
 /* --------------------------------- Sidebar -------------------------------- */
 
-type View =
-  | "search"
-  | "campaigns"
-  | "saved"
-  | "offers"
-  | "top10"
-  | "portfolio"
-  | "leaseEngine"
-  | "settings";
+type View = "search" | "saved" | "settings";
 
 const NAV_ITEMS: {
   key: View;
@@ -287,17 +281,7 @@ const NAV_ITEMS: {
   badgeText?: string;
 }[] = [
   { key: "search", icon: Search, label: "Search Domains" },
-  { key: "campaigns", icon: Target, label: "Campaigns" },
   { key: "saved", icon: Star, label: "Saved Domains" },
-  { key: "offers", icon: Mail, label: "Offers", badge: 3 },
-  { key: "top10", icon: TrendingUp, label: "Daily Top 10", premium: true },
-  { key: "portfolio", icon: Briefcase, label: "My Portfolio", premium: true },
-  {
-    key: "leaseEngine",
-    icon: Zap,
-    label: "Lease Engine",
-    badgeText: "$495/mo",
-  },
   { key: "settings", icon: Settings, label: "Settings" },
 ];
 
@@ -686,6 +670,64 @@ function HotRightNowBanner({
   );
 }
 
+/* ---------------------------- Budget tier selector ------------------------- */
+
+function formatBudgetAmount(value: number | null): string {
+  if (value === null) return "+";
+  if (value >= 1000) return `$${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}k`;
+  return `$${value}`;
+}
+
+function BudgetTierSelector({
+  value,
+  onChange,
+}: {
+  value: BudgetTier;
+  onChange: (budget: BudgetTier) => void;
+}) {
+  return (
+    <div className="mt-6">
+      <div className="text-sm font-semibold text-foreground">
+        What&apos;s your budget to buy domains?
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">
+        AI will only suggest domains and strategies that fit this range —
+        from $10 starter flips to $5,000+ premium plays.
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        {BUDGET_TIERS.map((tier) => {
+          const selected = value === tier.key;
+          return (
+            <button
+              key={tier.key}
+              type="button"
+              onClick={() => onChange(tier.key)}
+              className={`rounded-xl border-2 p-3 text-left transition-colors ${
+                selected
+                  ? "border-primary bg-primary/5"
+                  : "border-[#E2E8F0] bg-white hover:border-primary/40"
+              }`}
+            >
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                <span>{tier.emoji}</span>
+                {tier.label}
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                Buy {formatBudgetAmount(tier.buyRange.low)}–
+                {formatBudgetAmount(tier.buyRange.high)}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Sell {formatBudgetAmount(tier.sellRange.low)}–
+                {formatBudgetAmount(tier.sellRange.high)}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------ Search section ---------------------------- */
 
 const SUGGESTIONS = ["AI tools", "fitness app", "crypto"];
@@ -699,9 +741,8 @@ function SearchSection({
   isShaking,
   mode,
   onModeChange,
-  onCreateCampaign,
-  activeCampaign,
-  onClearCampaign,
+  budget,
+  onBudgetChange,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -711,9 +752,8 @@ function SearchSection({
   isShaking: boolean;
   mode: string;
   onModeChange: (mode: string) => void;
-  onCreateCampaign: () => void;
-  activeCampaign: Campaign | null;
-  onClearCampaign: () => void;
+  budget: BudgetTier;
+  onBudgetChange: (budget: BudgetTier) => void;
 }) {
   return (
     <div className="mt-8">
@@ -721,33 +761,10 @@ function SearchSection({
         Find Your Next Opportunity
       </h1>
       <p className="mt-2 text-muted-foreground">
-        AI scans 50,000+ expiring domains daily
+        AI scans 50,000+ expiring domains daily — matched to your budget
       </p>
 
-      <Button
-        variant="outline"
-        className="mt-4 border-primary text-primary hover:bg-primary/5"
-        onClick={onCreateCampaign}
-      >
-        + Create Campaign
-      </Button>
-
-      {activeCampaign && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
-          <span className="text-foreground">
-            <Target className="mr-1.5 inline size-4 text-primary" />
-            Campaign: <span className="font-semibold">{activeCampaign.name}</span>{" "}
-            · ${activeCampaign.maxPerDomain}/domain
-          </span>
-          <button
-            type="button"
-            onClick={onClearCampaign}
-            className="font-medium text-muted-foreground hover:text-foreground"
-          >
-            Clear
-          </button>
-        </div>
-      )}
+      <BudgetTierSelector value={budget} onChange={onBudgetChange} />
 
       <form
         onSubmit={(event) => {
@@ -5930,6 +5947,7 @@ export function Dashboard() {
   const [inputValue, setInputValue] = useState("AI tools");
   const [submittedQuery, setSubmittedQuery] = useState("AI tools");
   const [mode, setMode] = useState("flip");
+  const [budget, setBudget] = useState<BudgetTier>("growth");
   const [isSearching, setIsSearching] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(false);
   const [skeletonFading, setSkeletonFading] = useState(false);
@@ -5951,12 +5969,6 @@ export function Dashboard() {
     action?: { label: string; onClick: () => void };
   } | null>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [wizardOpen, setWizardOpen] = useState(false);
-  const [showCampaignSuccess, setShowCampaignSuccess] = useState(false);
-  const [activeCampaignId, setActiveCampaignId] = useState<string | null>(
-    null
-  );
   const [beginnerMode, setBeginnerMode] = useState(false);
   const [showBeginnerNudge, setShowBeginnerNudge] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -6118,7 +6130,12 @@ export function Dashboard() {
     fetch("/api/search-domains", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: trimmed, category: mode, limit: 10 }),
+      body: JSON.stringify({
+        query: trimmed,
+        category: mode,
+        budget,
+        limit: 10,
+      }),
     })
       .then(async (response) => {
         const data = await response.json();
@@ -6153,7 +6170,7 @@ export function Dashboard() {
     fetch("/api/analyze-domain", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ domain }),
+      body: JSON.stringify({ domain, budget }),
     })
       .then(async (response) => {
         const data = await response.json();
@@ -6234,41 +6251,6 @@ export function Dashboard() {
     });
   };
 
-  const activeCampaign =
-    campaigns.find((campaign) => campaign.id === activeCampaignId) ?? null;
-
-  const handleLaunchCampaign = (draft: CampaignDraft) => {
-    if (!draft.goal) return;
-    const campaign: Campaign = {
-      id: `campaign-${Date.now()}`,
-      name: draft.name.trim(),
-      goal: draft.goal,
-      maxTotal: Number(draft.maxTotal) || 0,
-      maxPerDomain: Number(draft.maxPerDomain) || 0,
-      includeFree: draft.includeFree,
-      risk: draft.risk,
-    };
-    setCampaigns((prev) => [...prev, campaign]);
-    setWizardOpen(false);
-    setShowCampaignSuccess(true);
-    setTimeout(() => {
-      setShowCampaignSuccess(false);
-      setActiveView("campaigns");
-    }, 700);
-  };
-
-  const goalToMode: Record<CampaignGoal, string> = {
-    "quick-flip": "flip",
-    "long-term": "build",
-    business: "build",
-  };
-
-  const handleFindDomains = (campaign: Campaign) => {
-    setActiveCampaignId(campaign.id);
-    setMode(goalToMode[campaign.goal]);
-    setActiveView("search");
-  };
-
   return (
     <AuthContext.Provider value={{ user, userPlan, isPro, isProPlus }}>
     <BeginnerModeContext.Provider value={{ beginnerMode, setBeginnerMode }}>
@@ -6309,9 +6291,8 @@ export function Dashboard() {
               isShaking={isShaking}
               mode={mode}
               onModeChange={setMode}
-              onCreateCampaign={() => setWizardOpen(true)}
-              activeCampaign={activeCampaign}
-              onClearCampaign={() => setActiveCampaignId(null)}
+              budget={budget}
+              onBudgetChange={setBudget}
             />
             <ResultsSection
               query={submittedQuery}
@@ -6330,20 +6311,6 @@ export function Dashboard() {
             />
           </>
         )}
-        {activeView === "campaigns" && (
-          <CampaignsView
-            campaigns={campaigns}
-            onNewCampaign={() => setWizardOpen(true)}
-            onFindDomains={handleFindDomains}
-          />
-        )}
-        {activeView === "top10" && (
-          <DailyTop10View
-            onOpenDetail={setSelectedDomain}
-            savedDomains={savedDomains}
-            onToggleSave={toggleSaved}
-          />
-        )}
         {activeView === "saved" && (
           <SavedDomainsView
             savedDomains={savedDomains}
@@ -6353,13 +6320,10 @@ export function Dashboard() {
             onStartSearching={() => setActiveView("search")}
           />
         )}
-        {activeView === "offers" && <OffersView />}
-        {activeView === "portfolio" && <PortfolioView />}
-        {activeView === "leaseEngine" && <LeaseEngineView onToast={showToast} />}
         {activeView === "settings" && (
           <SettingsView
             savedDomainsCount={savedDomains.size}
-            campaignsCount={campaigns.length}
+            campaignsCount={0}
             onToast={showToast}
           />
         )}
@@ -6375,15 +6339,6 @@ export function Dashboard() {
       )}
 
       {toast && <Toast message={toast.message} action={toast.action} />}
-
-      {wizardOpen && (
-        <CampaignWizardModal
-          onClose={() => setWizardOpen(false)}
-          onLaunch={handleLaunchCampaign}
-        />
-      )}
-
-      {showCampaignSuccess && <CampaignSuccessFlash />}
 
       {showBeginnerNudge && (
         <BeginnerNudgeToast

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
-import type { DomainAnalysis } from "@/lib/types";
+import { BUDGET_TIERS } from "@/lib/types";
+import type { BudgetTier, DomainAnalysis } from "@/lib/types";
 
 // Free users: max 5 analyze-domain calls per hour, tracked by IP.
 const ANALYZE_RATE_LIMIT = 5;
@@ -44,6 +45,13 @@ Return this exact JSON structure:
 
 Respond with ONLY valid JSON. No explanation outside the JSON.`;
 
+function budgetInstruction(budget: BudgetTier): string {
+  const tier = BUDGET_TIERS.find((t) => t.key === budget) ?? BUDGET_TIERS[1];
+  const buyHigh = tier.buyRange.high ? `$${tier.buyRange.high}` : "no set ceiling";
+  const sellHigh = tier.sellRange.high ? `$${tier.sellRange.high}` : "no set ceiling";
+  return `\n\nThe buyer evaluating this domain is a "${tier.label}" tier investor: ${tier.description}. Their buy budget is $${tier.buyRange.low}-${buyHigh} per domain, and they're targeting resale in the $${tier.sellRange.low}-${sellHigh} range. Tailor flipStrategy.buyPrice, listPrice, and quickSalePrice to be realistic and actionable for THIS buyer specifically — don't suggest a $200 buy price to someone with a $10-50 budget, and don't suggest a timid $150 flip to someone with $5,000+ to deploy. If the domain's true market value is far outside what this buyer can realistically afford or profitably flip at their tier, say so plainly in whyInteresting or risks instead of forcing an unrealistic strategy.`;
+}
+
 function extractJsonObject(text: string): unknown {
   const trimmed = text.trim();
   const start = trimmed.indexOf("{");
@@ -65,9 +73,11 @@ export async function POST(request: Request) {
   }
 
   let domain: string;
+  let budget: BudgetTier;
   try {
     const body = await request.json();
     domain = String(body.domain ?? "").trim();
+    budget = (body.budget ?? "growth") as BudgetTier;
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
@@ -86,7 +96,7 @@ export async function POST(request: Request) {
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
       max_tokens: 1024,
-      system: SYSTEM_PROMPT,
+      system: SYSTEM_PROMPT + budgetInstruction(budget),
       messages: [
         { role: "user", content: `Analyze this domain: ${domain}` },
       ],

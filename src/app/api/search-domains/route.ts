@@ -1,17 +1,34 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
-import type { DomainResult, SearchParams } from "@/lib/types";
+import { BUDGET_TIERS } from "@/lib/types";
+import type { BudgetTier, DomainResult, SearchParams } from "@/lib/types";
 
 const SEARCH_RATE_LIMIT = 30;
 
-const SYSTEM_PROMPT = `You are a domain research tool. Given a search query and an optional TLD filter, suggest realistic expired or available domain names that would match. Return a JSON array of domain objects, each with:
+const SYSTEM_PROMPT = `You are a domain research tool for a flipping platform. Given a search query, an optional TLD filter, and a buyer's budget tier, suggest realistic expired or available domain names that would match — and that the buyer can actually afford and realistically resell.
+
+Return a JSON array of domain objects, each with:
 - domain: string (full domain with TLD, e.g. 'aiinvoice.com')
 - age: number (years, estimated)
 - referringDomains: number (estimated backlinks)
-- auctionPrice: number (USD, realistic auction starting bid)
+- auctionPrice: number (USD, realistic auction starting bid — MUST fall within the buyer's stated buy range)
 - tld: string ('.com', '.io', '.net', etc.)
+
+BUDGET DISCIPLINE — this is the most important rule:
+- Every domain's auctionPrice MUST realistically fall within the buyer's buy range for their tier. Do not suggest $30,000 one-word .com domains to a Starter buyer with a $10-50 budget — that's useless to them.
+- Starter ($10-50 buy): fresh-drop/expired domains, 2-4 word brandables, newer TLDs, little to no backlink history. Realistic starter-flip inventory, not fantasy domains.
+- Growth ($50-500 buy): domains with some age/backlinks, decent 2-word .com or .io names, early-niche keyword matches.
+- Pro ($500-5,000 buy): established aged domains, strong keyword or brandable .com/.io names, some exact-match value.
+- Expert ($5,000+ buy): premium one/two-word .com domains, exact-match high-value keywords, domains with real sale comps in the tens of thousands.
 Suggest 8-12 domains. Make them realistic and relevant to the query. If a TLD filter other than "all" is given, every domain MUST use that TLD. Respond with ONLY a JSON array.`;
+
+function budgetContext(budget: BudgetTier): string {
+  const tier = BUDGET_TIERS.find((t) => t.key === budget) ?? BUDGET_TIERS[0];
+  const buyHigh = tier.buyRange.high ? `$${tier.buyRange.high}` : "no upper limit";
+  const sellHigh = tier.sellRange.high ? `$${tier.sellRange.high}` : "no upper limit";
+  return `Buyer tier: ${tier.label} (${tier.description}). Buy budget: $${tier.buyRange.low}-${buyHigh}. Target resale range: $${tier.sellRange.low}-${sellHigh}.`;
+}
 
 function extractJsonArray(text: string): unknown[] {
   const trimmed = text.trim();
@@ -39,6 +56,7 @@ export async function POST(request: Request) {
     params = {
       query: String(body.query ?? "").trim(),
       category: (body.category ?? "all") as SearchParams["category"],
+      budget: (body.budget ?? "growth") as SearchParams["budget"],
       limit: Number(body.limit) || 10,
     };
   } catch {
@@ -65,7 +83,7 @@ export async function POST(request: Request) {
       messages: [
         {
           role: "user",
-          content: `Search query: "${params.query}". TLD filter: ${tldFilter}. Suggest domains.`,
+          content: `Search query: "${params.query}". TLD filter: ${tldFilter}. ${budgetContext(params.budget)} Suggest domains that fit this buyer's budget.`,
         },
       ],
     });
