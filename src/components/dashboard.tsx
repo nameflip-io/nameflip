@@ -1389,6 +1389,10 @@ interface DomainResult {
   isLive?: boolean;
   liveAge?: number;
   liveBacklinks?: number;
+  // AI Discovery Engine's Buy/Consider/Avoid call — present only for cards
+  // sourced from a live /api/search-domains result.
+  verdict?: "buy" | "consider" | "avoid";
+  verdictReason?: string;
 }
 
 interface SelectedDomain {
@@ -1473,6 +1477,8 @@ function mapApiDomainToCard(
     isLive: true,
     liveAge: api.age,
     liveBacklinks: api.referringDomains,
+    verdict: api.verdict,
+    verdictReason: api.verdictReason,
   };
 }
 
@@ -1622,6 +1628,8 @@ function ResultCard({
   isLive,
   liveAge,
   liveBacklinks,
+  verdict,
+  verdictReason,
   onToggleSave,
   onOpenDetail,
 }: DomainResult & {
@@ -1787,6 +1795,20 @@ function ResultCard({
             )}
           </div>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {verdict && (
+              <span
+                title={verdictReason}
+                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
+                  verdict === "buy"
+                    ? "bg-emerald-100 text-emerald-700"
+                    : verdict === "consider"
+                      ? "bg-amber-100 text-amber-700"
+                      : "bg-slate-200 text-slate-600"
+                }`}
+              >
+                {verdict === "buy" ? "Buy" : verdict === "consider" ? "Consider" : "Avoid"}
+              </span>
+            )}
             {tags.map((cardTag) => (
               <span
                 key={cardTag.label}
@@ -1878,6 +1900,23 @@ function ResultCard({
           </p>
         </div>
       </div>
+
+      {verdictReason && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          <span
+            className={`font-semibold ${
+              verdict === "buy"
+                ? "text-emerald-600"
+                : verdict === "consider"
+                  ? "text-amber-600"
+                  : "text-slate-500"
+            }`}
+          >
+            AI verdict:
+          </span>{" "}
+          {verdictReason}
+        </p>
+      )}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#E2E8F0] pt-4">
         <p className="text-xs text-muted-foreground">

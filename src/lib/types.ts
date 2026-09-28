@@ -27,6 +27,8 @@ export interface DomainResult {
   available?: boolean;
   registrationPrice?: number;
   analysis?: DomainAnalysis;
+  verdict?: "buy" | "consider" | "avoid";
+  verdictReason?: string;
 }
 
 export type BudgetTier = "starter" | "growth" | "pro" | "expert";
