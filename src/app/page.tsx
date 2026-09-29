@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Check, Clock, Lock } from "lucide-react";
+import { Check, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -11,10 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { HeroSearch } from "@/components/hero-search";
-import { AvatarStack } from "@/components/avatar-stack";
-import { LiveCounter } from "@/components/live-counter";
 import { HowItWorks } from "@/components/how-it-works";
-import { SocialProofToast } from "@/components/social-proof-toast";
 import { SiteHeader } from "@/components/site-header";
 import { PricingCtaButton } from "@/components/pricing-cta-button";
 import { CtaSearch } from "@/components/cta-search";
@@ -25,7 +22,6 @@ const tiers = [
   {
     name: "Free",
     price: "$0",
-    originalPrice: null as string | null,
     description: "Try NameFlip and see your first opportunities.",
     included: [
       "5 searches per month",
@@ -35,10 +31,8 @@ const tiers = [
     ],
     notIncluded: [
       "Full AI analysis",
-      "Daily Top 10 feed",
       "Saved domains (max 3)",
       "Domain detail reports",
-      "Auction alerts",
     ] as string[] | null,
     cta: "Start for Free",
     href: "/login",
@@ -47,11 +41,9 @@ const tiers = [
   {
     name: "Pro",
     price: "$19",
-    originalPrice: "$39" as string | null,
     description: "For hunters who search every day.",
     included: [
       "Unlimited searches",
-      "Daily Top 10 feed",
       "Full AI analysis",
       "Saved domains",
     ],
@@ -63,14 +55,8 @@ const tiers = [
   {
     name: "Pro+",
     price: "$49",
-    originalPrice: "$99" as string | null,
     description: "For power users building a portfolio.",
-    included: [
-      "Everything in Pro",
-      "Auction alerts",
-      "Niche trend radar",
-      "Portfolio tracker",
-    ],
+    included: ["Everything in Pro"],
     notIncluded: null as string[] | null,
     cta: "Get Started",
     href: "#",
@@ -108,14 +94,12 @@ function Hero() {
         </Badge>
 
         <h1 className="text-balance font-heading text-5xl font-bold tracking-tight text-[#0F172A] sm:text-7xl">
-          Find Domains Worth Buying.
-          <br />
-          Before Everyone Else.
+          Find domains worth buying.
         </h1>
 
         <p className="mt-6 max-w-2xl text-balance text-lg text-[#64748B]">
-          AI scans thousands of domains daily and tells you exactly which
-          ones are worth buying, flipping, or building on.
+          Describe a niche and your budget. NameFlip suggests domain names,
+          checks them, and explains which ones look worth buying.
         </p>
 
         <HeroSearch />
@@ -123,44 +107,6 @@ function Hero() {
         <p className="mt-4 text-xs text-muted-foreground sm:text-sm">
           Free to start · No credit card required
         </p>
-      </div>
-    </section>
-  );
-}
-
-function StatItem({ value, label }: { value: string; label: string }) {
-  return (
-    <div className="flex flex-col items-center">
-      <span className="text-lg font-semibold text-primary sm:text-xl">
-        {value}
-      </span>
-      <span className="text-xs text-muted-foreground sm:text-sm">{label}</span>
-    </div>
-  );
-}
-
-function SocialProof() {
-  return (
-    <section className="bg-white">
-      <div className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-6 py-12 text-center">
-        <AvatarStack />
-
-        <p className="text-sm text-muted-foreground sm:text-base">
-          Join{" "}
-          <span className="font-medium text-foreground">
-            <LiveCounter />
-          </span>{" "}
-          domain
-          hunters already finding opportunities
-        </p>
-
-        <div className="flex items-center justify-center gap-4 sm:gap-8">
-          <StatItem value="50K+" label="Domains Analyzed Daily" />
-          <span className="h-8 w-px bg-border" />
-          <StatItem value="4.9★" label="Average Rating" />
-          <span className="h-8 w-px bg-border" />
-          <StatItem value="$2.4M+" label="In Domain Deals Found" />
-        </div>
       </div>
     </section>
   );
@@ -205,16 +151,6 @@ function Pricing() {
                     </span>
                     <span className="text-sm text-muted-foreground">/mo</span>
                   </span>
-                  {tier.originalPrice && (
-                    <>
-                      <span className="text-sm text-muted-foreground line-through">
-                        {tier.originalPrice}/mo
-                      </span>
-                      <Badge className="bg-emerald-100 text-emerald-700">
-                        Save 51%
-                      </Badge>
-                    </>
-                  )}
                 </div>
                 <CardDescription>{tier.description}</CardDescription>
               </CardHeader>
@@ -271,11 +207,6 @@ function Pricing() {
           </div>
         ))}
       </div>
-
-      <p className="mx-auto mt-10 flex max-w-6xl items-center justify-center gap-1.5 px-6 text-center text-xs text-muted-foreground">
-        <Clock className="size-3.5 shrink-0" />
-        Prices increase at the end of the month — lock in your rate today.
-      </p>
     </section>
   );
 }
@@ -331,9 +262,7 @@ function FinalCta() {
           next domain?
         </h2>
         <p className="mb-10 text-lg text-gray-300">
-          Join thousands of side hustlers and entrepreneurs
-          <br />
-          finding undervalued domains every single day.
+          Start with a free search. No credit card required.
         </p>
 
         <CtaSearch />
@@ -422,14 +351,12 @@ export default function Home() {
       <SiteHeader />
       <main className="flex-1">
         <Hero />
-        <SocialProof />
         <HowItWorks />
         <Pricing />
         <FinalCta />
         <FaqSection />
       </main>
       <Footer />
-      <SocialProofToast />
     </div>
   );
 }
